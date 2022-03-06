@@ -10,18 +10,25 @@
 
 #include "config.h"
 
+#ifndef ESP8266
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#else
+#include <Arduino.h>
+#include <HardwareSerial.h>
+#endif
 
 #include <string.h>
 
 #include "cc1101.h"
 #include "frame.h"
-#include "uart.h"
+#include "uart_evo.h"
 
 #include "debug.h"
 #define DEBUG_ISR(_v)      DEBUG1(_v)
 #define DEBUG_EDGE(_v)     DEBUG2(_v)
+
+static void tx_fifo_fill(void);
 
 #if defined(SWUART)
 /***************************************************************************
@@ -601,7 +608,11 @@ enum tx_fifo_state {
 } tx_state;
 
 static void tx_stop(void) {
-  EIMSK &= ~(1 << GDO0_INT_MASK);  // Disable interrupts
+  //GDO0  - Serial input TX data to CC1101
+  //not sure why you'd disable interrripts when this is sending data _to_ CC1101
+  //I guess the interrupt is triggering the send
+
+  //EIMSK &= ~(1 << GDO0_INT_MASK);  // Disable interrupts
 }
 
 static void tx_fifo_wait(void) {
@@ -638,8 +649,20 @@ static void tx_prime( void ) {
   // So we can see an interrupt when it falls below threshold
   // send sufficient data to fill FIFO above threshold
   txBits = 0;
-  while( !( GDO0_PIN & GDO0_IN ) )
+  //while( !( GDO0_PIN & GDO0_IN ) )
+  while( !( digitalRead(GDO0_PIN) ) )
     tx_fifo_send_block();
+}
+
+
+IRAM_ATTR void gdo0_int_vec_handler() {
+//ISR( GDO0_INT_VECT ) { // Fifo interrupts
+DEBUG_ISR(1);
+  switch(tx_state) {
+    case TX_FIFO_FILL:  tx_fifo_fill();  break;
+	case TX_FIFO_WAIT:  tx_fifo_wait();  break;
+  }
+DEBUG_ISR(0);
 }
 
 static void tx_fifo_fill(void) {
@@ -651,9 +674,10 @@ static void tx_fifo_fill(void) {
     tx_state = TX_FIFO_WAIT;
 	 
     // Switch to rising edge
-    EIFR   = GDO0_INT_MASK ;    // Acknowledge any previous edges
-    EICRA &= ~GDO0_INT_ISCn0 & ~GDO0_INT_ISCn1;
-    EICRA |=  GDO0_INT_ISCn0 |  GDO0_INT_ISCn1;
+    //EIFR   = GDO0_INT_MASK ;    // Acknowledge any previous edges
+    //EICRA &= ~GDO0_INT_ISCn0 & ~GDO0_INT_ISCn1;
+    //EICRA |=  GDO0_INT_ISCn0 |  GDO0_INT_ISCn1;
+    attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,RISING); //TODO: not sure this is right
   }
 }
 
@@ -662,26 +686,30 @@ static void tx_init(void) {
 
 static void tx_start(void) {
   // Falling edge
-  EICRA &= ~GDO0_INT_ISCn0 & ~GDO0_INT_ISCn1;
-  EICRA |=                    GDO0_INT_ISCn1;
+  //EICRA &= ~GDO0_INT_ISCn0 & ~GDO0_INT_ISCn1;
+  //EICRA |=                    GDO0_INT_ISCn1;
+  
 
   tx_prime();
   tx_state = TX_FIFO_FILL;
 
-  EIFR   = GDO0_INT_MASK ;    // Acknowledge any previous edges
-  EIMSK |= GDO0_INT_MASK ;    // Enable interrupts
+  //EIFR   = GDO0_INT_MASK ;    // Acknowledge any previous edges
+  //EIMSK |= GDO0_INT_MASK ;    // Enable interrupts
+  attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,FALLING); //TODO: not sure this is right
 }
 
+
+static void rx_start(void) {
+}
+
+static void rx_stop(void) {
+}
+
+static void rx_init(void) {
+}
 //---------------------------------------------------------------------------------
 
-ISR( GDO0_INT_VECT ) { // Fifo interrupts
-DEBUG_ISR(1);
-  switch(tx_state) {
-    case TX_FIFO_FILL:  tx_fifo_fill();  break;
-	case TX_FIFO_WAIT:  tx_fifo_wait();  break;
-  }
-DEBUG_ISR(0);
-}
+
 
 /***************************************************************************
 ****************************************************************************
@@ -690,49 +718,66 @@ DEBUG_ISR(0);
 ****************************************************************************/
 
 void uart_rx_enable(void) {
-  uint8_t sreg = SREG;
-  cli();
+  //uint8_t sreg = SREG;
+  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  //#define interrupts() xt_rsil(0) //Arduino.h
+  //#define noInterrupts() xt_rsil(15) //Arduino.h
+  //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occurring
 
   tx_stop();
   rx_start();
 
-  SREG = sreg;
+  //SREG = sreg;
+  xt_wsr_ps(savedPS); // restore the state
 }
 
 void uart_tx_enable(void) {
-  uint8_t sreg = SREG;
-  cli();
+  //uint8_t sreg = SREG;
+  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occurring
 
   rx_stop();
   tx_start();
 
-  SREG = sreg;
+  //SREG = sreg;
+  xt_wsr_ps(savedPS); // restore the state
 }
 
 void uart_disable(void) {
-  uint8_t sreg = SREG;
-  cli();
+  //uint8_t sreg = SREG;
+  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occur
 	
   rx_stop();
   tx_stop();
 
-  SREG = sreg;
+  //SREG = sreg;
+  xt_wsr_ps(savedPS); // restore the state
 }
 
 void uart_work(void) {
 }
 
-void uart_init(void) {
-  uint8_t sreg = SREG;
-  cli();
-
-  GDO0_DDR  &= ~GDO0_IN;        // Input (for TX Fifo interrupts)
+void uart_init_evo(void) {
+  Serial.begin(RADIO_BAUDRATE);
+  attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,CHANGE); //not sure CHANGE is right
+  //uint8_t sreg = SREG;
+  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occur
+  noInterrupts();
+  pinMode(MISO, SPECIAL);
+  pinMode(MISO, INPUT);
+  pinMode(MISO, OUTPUT);
+  pinMode(GDO0_PIN,INPUT);
+  //GDO0_DDR  &= ~GDO0_IN;        // Input (for TX Fifo interrupts)
   
-  GDO2_DDR  &= ~GDO2_IN;        // Input (for RX Data)
-  GDO2_PORT |=  GDO2_IN;		// Set input pull-up
+  pinMode(GDO2_PIN,INPUT_PULLUP);
+  //GDO2_DDR  &= ~GDO2_IN;        // Input (for RX Data)
+  //GDO2_PORT |=  GDO2_IN;		// Set input pull-up
 
   rx_init();
   tx_init();  
 
-  SREG = sreg;
+  //SREG = sreg;
+  xt_wsr_ps(savedPS); // restore the state
 }

@@ -1,12 +1,16 @@
 #include <string.h>
+#ifndef ESP8266
 #include <util/delay.h>
 
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
+#else
+#include <stddef.h>
+#endif
 
 #include "config.h"
 #include "message.h"
-#include "uart.h"
+#include "uart_evo.h"
 #include "cc1101.h"
 
 #include "frame.h"
@@ -133,7 +137,8 @@ static uint8_t evo_tlr[] = { 0x35 };
 static uint32_t syncWord;
 
 void frame_rx_byte(uint8_t byte) {
-  switch( rxFrm.state ) {
+  switch( rxFrm.state ) {
+
 
   case FRM_RX_IDLE:
     rxFrm.syncBuffer = byte;
@@ -379,7 +384,7 @@ void frame_init(void) {
     syncWord = ( syncWord<<8 ) | evo_hdr[i];
 
   frame_reset();
-  uart_init();
+  uart_init_evo();
 
   frame.state = FRM_IDLE;
 }

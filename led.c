@@ -1,4 +1,6 @@
+#ifndef ESP8266
 #include <avr/interrupt.h>
+#endif
 #include "led.h"
 #include "config.h"
 

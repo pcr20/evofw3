@@ -8,8 +8,15 @@
 ** L specifies the number of bytes that follow in
 ** V the value
 */
+#ifndef ESP8266
 #include <avr/eeprom.h>
 #include <avr/eeprom.h>
+#else
+#include <EEPROM.h>
+#include <stdint.h>
+#include <stddef.h>
+static uint8_t * EE_END=(uint8_t *)1024;
+#endif
 
 #include "cc1101_const.h"
 
@@ -18,16 +25,19 @@
 /***********************************************************************************
 * eeprom access
 */
-static uint8_t EEMEM eeprom[E2END+1];
-#define EE_END &( eeprom[E2END+1] )
+
+
+
+//static uint8_t EEMEM eeprom[E2END+1];
+//#define EE_END &( eeprom[E2END+1] )
 
 static uint8_t *ee_find_param( uint8_t id, uint8_t *len ) {
-  uint8_t *ee = eeprom;
+  uint8_t * ee = 0; //address weirdly the typedef is an int! - we'll use a pointer... but it's not a real pointer
   uint8_t t,l=0;
   
   while( ee<EE_END-1 ) {
-    t = eeprom_read_byte( ee );
-    l = eeprom_read_byte( ee+1 );
+    t = EEPROM.read( (int)ee );
+    l = EEPROM.read( (int)(ee+1) );
 
     if( t==id ) { // Found it
       if( ee+2+l > EE_END )
@@ -58,6 +68,23 @@ static uint8_t *ee_find_free( uint8_t *len ) {
   return ee;
 };
 
+static void eeprom_read_block( uint8_t *buff, uint8_t *offset, uint32_t len )
+{
+  for (int i=0;i<len;i++)
+  {
+    buff[i]=EEPROM.read((int)offset);
+  }
+}
+
+static void eeprom_update_block( uint8_t *buff, uint8_t *offset, uint32_t len )
+{
+  for (int i=0;i<len;i++)
+  {
+    EEPROM.write((int)offset,buff[i]);
+  }
+  EEPROM.commit();
+}
+
 static uint8_t ee_read_param( uint8_t id, uint8_t offset, uint8_t *buff, uint8_t buffLen ) {
   uint8_t len=0;
   uint8_t *ee = ee_find_param( id, &len );
@@ -84,8 +111,9 @@ static uint8_t ee_write_param( uint8_t id, uint8_t paramLen, uint8_t offset, uin
   if( ee==EE_END && paramLen==buffLen ) { // Doesn't exist yet
 	ee = ee_find_free( &len );
 	if( len>paramLen ) {
-	  eeprom_write_byte( ee, id );
-	  eeprom_write_byte( ee+1, paramLen );
+	  EEPROM.write( (int)ee, id );
+	  EEPROM.write( (int)(ee+1), paramLen );
+    EEPROM.commit(); //TODO error handling
 	  len = paramLen;
 	} else {
 	  len = 0;
@@ -103,16 +131,14 @@ static uint8_t ee_write_param( uint8_t id, uint8_t paramLen, uint8_t offset, uin
     if( len > 0 )
       eeprom_update_block( buff, ee+2+offset, len );
   }
-
+  
   return len;
 }
 
 void nv_reset(void) {
-  uint8_t buff[16] = { 0xFF,0xFF,0xFF,0xFF , 0xFF,0xFF,0xFF,0xFF , 0xFF,0xFF,0xFF,0xFF , 0xFF,0xFF,0xFF,0xFF };
-
-  uint8_t *ee;
-  for( ee=eeprom; ee<EE_END ; ee+=sizeof(buff) )
-    eeprom_update_block( buff, ee, sizeof(buff) );
+  for( int ee=0; ee<(int)EE_END ; ee++ )
+    EEPROM.write((int)ee,0xFF);
+  EEPROM.commit(); //TODO: error handling
 }
 
 /***********************************************************************************

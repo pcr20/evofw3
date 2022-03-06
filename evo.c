@@ -1,13 +1,15 @@
 #include <stdio.h>
 
+#ifndef ESP8266
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <avr/power.h>
+#endif
 
 #include "config.h"
 #include "led.h"
 #include "tty.h"
-#include "spi.h"
+#include "spi_evo.h"
 
 #include "gateway.h"
 
@@ -20,7 +22,7 @@ void main_init(void) {
 #endif
 
   wdt_disable();
-  clock_prescale_set(clock_div_1);
+  //clock_prescale_set(clock_div_1);
 
   led_init();
   tty_init();

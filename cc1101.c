@@ -6,16 +6,19 @@
 * Hardware interface to TI CC1101 radio chip
 *
 */
-
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-#include <util/delay.h>
+#ifndef ESP8266
+  #include <avr/interrupt.h>
+  #include <avr/pgmspace.h>
+  #include <util/delay.h>
+#else
+  #include <Arduino.h>
+#endif
 
 #include "trace.h"
 
 //#define ENABLE_TX
 
-#include "spi.h"
+#include "spi_evo.h"
 #include "config.h"
 #include "cc1101_param.h"
 #include "cc1101.h"
@@ -57,16 +60,18 @@ uint8_t cc_write_fifo(uint8_t b) {
 #define INT_MASK ( GDO0_INT_MASK | GDO2_INT_MASK  )
 
 void cc_enter_idle_mode(void) {
-  EIMSK &= ~INT_MASK;            // Disable interrupts
+  //EIMSK &= ~INT_MASK;            // Disable interrupts
+  noInterrupts();
 
   while ( CC_STATE( spi_strobe( CC1100_SIDLE ) ) != CC_STATE_IDLE );
 
-  EIFR  |= INT_MASK;          // Acknowledge any  previous edges
+  //EIFR  |= INT_MASK;          // Acknowledge any  previous edges
+  interrupts();
 }
 
 void cc_enter_rx_mode(void) {
-  EIMSK &= ~INT_MASK;            // Disable interrupts
-
+  //EIMSK &= ~INT_MASK;            // Disable interrupts
+  noInterrupts();
   while ( CC_STATE( spi_strobe( CC1100_SIDLE ) ) != CC_STATE_IDLE ){}
 
   cc_write( CC1100_IOCFG0, 0x2E );      // GDO0 not needed
@@ -74,13 +79,13 @@ void cc_enter_rx_mode(void) {
 
   spi_strobe( CC1100_SFRX );
   while ( CC_STATE( spi_strobe( CC1100_SRX ) ) != CC_STATE_RX ){}
-
-  EIFR  |= INT_MASK;          // Acknowledge any  previous edges
+  interrupts();
+  //EIFR  |= INT_MASK;          // Acknowledge any  previous edges
 }
 
 void cc_enter_tx_mode(void) {
-  EIMSK &= ~INT_MASK;            // Disable interrupts
-
+  //EIMSK &= ~INT_MASK;            // Disable interrupts
+  noInterrupts();
   while ( CC_STATE( spi_strobe( CC1100_SIDLE ) ) != CC_STATE_IDLE ){}
 
   cc_write( CC1100_PKTCTRL0, 0x02 );    // Fifo mode, infinite packet
@@ -89,7 +94,8 @@ void cc_enter_tx_mode(void) {
   spi_strobe( CC1100_SFTX );
   while ( CC_STATE( spi_strobe( CC1100_STX ) ) != CC_STATE_TX ){}
 
-  EIFR  |= INT_MASK;          // Acknowledge any  previous edges
+  //EIFR  |= INT_MASK;          // Acknowledge any  previous edges
+  interrupts();
 }
 
 void cc_fifo_end(void) {
@@ -105,10 +111,11 @@ uint8_t cc_read_rssi(void) {
 }
 
 uint8_t cc_param( uint8_t reg, uint8_t nReg, uint8_t *param ) {
+
   uint8_t valid = 0;
 
   if( reg<CC1100_PARAM_MAX && (reg+nReg)<CC1100_PARAM_MAX ) {
-    uint8_t eimsk = EIMSK;
+    //uint8_t eimsk = EIMSK; //save interrupt state
     valid = 1;
 	
     cc_enter_idle_mode();
@@ -118,7 +125,7 @@ uint8_t cc_param( uint8_t reg, uint8_t nReg, uint8_t *param ) {
     }
     cc_enter_rx_mode();
 
-    EIMSK = eimsk;
+    //EIMSK = eimsk; //restore interrupt state
   }
   
   return valid;

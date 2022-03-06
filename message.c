@@ -6,10 +6,10 @@
 ********************************************************/
 #include <string.h>
 #include <stdio.h>
-
+#ifndef ESP8266
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
-
+#endif
 #include "config.h"
 #include "trace.h"
 

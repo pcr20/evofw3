@@ -8,13 +8,17 @@
 #elif defined ARDUINO_EVOFW3_ATMEGA328P
 #include "atm328_pins.h"
 
+#elif defined ESP8266
+#include "esp8266_pins.h"
+#define HOST_RATE 115200
+
 #else
 #error "CC1101 connection not defined for target - use evofw3_avr board definitions"
 #endif
 
 #include "debug.h"
 
-#define SPI_CLK_RATE    250000
+#define SPI_CLK_RATE    6500000
 
 #if defined(HOST_RATE)
 #define TTY_BAUD_RATE   HOST_RATE

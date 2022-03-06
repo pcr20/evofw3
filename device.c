@@ -5,7 +5,13 @@
 **
 ********************************************************/
 #include <stddef.h>
+#ifndef ESP8266
 #include <avr/boot.h>
+#else
+#include <stdint.h>
+#endif
+
+
 
 #include "device.h"
 
