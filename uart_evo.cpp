@@ -10,7 +10,7 @@
 
 #include "config.h"
 
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #else
@@ -719,7 +719,10 @@ static void rx_init(void) {
 
 void uart_rx_enable(void) {
   //uint8_t sreg = SREG;
-  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #endif
+  
   //#define interrupts() xt_rsil(0) //Arduino.h
   //#define noInterrupts() xt_rsil(15) //Arduino.h
   //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occurring
@@ -728,31 +731,41 @@ void uart_rx_enable(void) {
   rx_start();
 
   //SREG = sreg;
-  xt_wsr_ps(savedPS); // restore the state
+  #ifdef ESP8266
+    xt_wsr_ps(savedPS); // restore the state
+  #endif
 }
 
 void uart_tx_enable(void) {
   //uint8_t sreg = SREG;
-  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #endif
   //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occurring
 
   rx_stop();
   tx_start();
 
   //SREG = sreg;
-  xt_wsr_ps(savedPS); // restore the state
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    xt_wsr_ps(savedPS); // restore the state
+  #endif
 }
 
 void uart_disable(void) {
   //uint8_t sreg = SREG;
-  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #endif
   //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occur
 	
   rx_stop();
   tx_stop();
 
   //SREG = sreg;
-  xt_wsr_ps(savedPS); // restore the state
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    xt_wsr_ps(savedPS); // restore the state
+  #endif
 }
 
 void uart_work(void) {
@@ -762,7 +775,9 @@ void uart_init_evo(void) {
   Serial.begin(RADIO_BAUDRATE);
   attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,CHANGE); //not sure CHANGE is right
   //uint8_t sreg = SREG;
-  uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
+  #endif
   //cli(); //cli clears the global interrupt flag in SREG so prevent any form of interrupt occur
   noInterrupts();
   pinMode(MISO, SPECIAL);
@@ -779,5 +794,7 @@ void uart_init_evo(void) {
   tx_init();  
 
   //SREG = sreg;
-  xt_wsr_ps(savedPS); // restore the state
+  #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
+    xt_wsr_ps(savedPS); // restore the state
+  #endif
 }

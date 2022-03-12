@@ -4,7 +4,13 @@
 ** Debug command processing
 **
 ********************************************************/
+#if !(defined(ESP8266) || defined(ESP32))
 #include <avr/pgmspace.h>
+#endif
+
+#ifdef ESP32
+#include <pgmspace.h>
+#endif
 
 #include <string.h>
 #include <stdio.h>

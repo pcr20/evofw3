@@ -6,10 +6,14 @@
 ********************************************************/
 #include <string.h>
 #include <stdio.h>
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #endif
+#ifdef ESP32
+#include <pgmspace.h>
+#endif
+
 #include "config.h"
 #include "trace.h"
 
@@ -17,6 +21,7 @@
 #include "message.h"
 
 #define DEBUG_MSG(_v) DEBUG4(_v)
+
 
 /********************************************************
 ** Message status

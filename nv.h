@@ -6,6 +6,8 @@
 #ifndef _NV_H_
 #define _NV_H_
 
+#include <stdint.h>
+
 #define _NV_PARAM_LIST \
   _NV_PARAM( NV_CC_PARAM, 'C', CC1100_PARAM_MAX, "CC1101 Parameters" ) \
   _NV_PARAM( NV_CC_PA,    'P', CC1100_PA_MAX,    "CC1101 Power Table" ) \

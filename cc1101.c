@@ -6,12 +6,12 @@
 * Hardware interface to TI CC1101 radio chip
 *
 */
-#ifndef ESP8266
+#if defined(ESP8266) || defined(ESP32)
+  #include <Arduino.h>
+#else
   #include <avr/interrupt.h>
   #include <avr/pgmspace.h>
   #include <util/delay.h>
-#else
-  #include <Arduino.h>
 #endif
 
 #include "trace.h"

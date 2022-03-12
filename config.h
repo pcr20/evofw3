@@ -8,8 +8,8 @@
 #elif defined ARDUINO_EVOFW3_ATMEGA328P
 #include "atm328_pins.h"
 
-#elif defined ESP8266
-#include "esp8266_pins.h"
+#elif defined(ESP8266) || defined(ESP32)
+#include "esp_pins.h"
 #define HOST_RATE 115200
 
 #else

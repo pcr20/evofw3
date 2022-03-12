@@ -1,18 +1,18 @@
 /**********************************************************
-** esp8266_pins.h
+** esp_pins.h
 **
 ** Abstract pin names and definitions for ESP8266
 **
 */
 
 #ifndef _CONFIG_H_
-#  error "Include config.h instead of this file"
+ #error "Include config.h instead of this file"
 #endif
 
 #ifndef _HW_ARDUINO_H_
 #define _HW_ARDUINO_H_
 
-#ifdef ESP8266
+#if defined(ESP8266) || defined(ESP32)
 #define INT0 0
 #define INT1 1
 #define EIMSK 1
@@ -21,11 +21,19 @@
 #include <avr/io.h>
 #endif
 // SPI port defs
-
+#if defined(ESP8266)
 #define SPI_SS      15
 #define SPI_MOSI    13 //GPIO13 https://arduino-esp8266.readthedocs.io/en/latest/libraries.html?highlight=spi#spi
 #define SPI_MISO    12 //GPIO12
 #define SPI_SCLK    14 //GPIO14
+#elif defined(ESP32)
+#define SPI_SS      5 //GPIO5
+#define SPI_MOSI    23 //GPIO23 https://arduino-esp8266.readthedocs.io/en/latest/libraries.html?highlight=spi#spi
+#define SPI_MISO    19 //GPIO19
+#define SPI_SCLK    18 //GPIO18
+#else
+#error wrong processor
+#endif
 
 // GDO0 connection - Serial input TX data to CC1101
   #define GDO0_PIN        4
@@ -75,7 +83,7 @@
 #endif // SWUART
 
 // Some debug pins
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #define DEBUG_PORT        PORTC
 #define DEBUG_DDR         DDRC
 #define DEBUG_PIN1        ( 1<<PORTC0 )

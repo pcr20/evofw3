@@ -7,6 +7,8 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
+#include <stdint.h>
+
 #define _MSG_ERR_LIST \
   _MSG_ERR( MSG_SIG_ERR,      "Bad Signature" ) \
   _MSG_ERR( MSG_SYNC_ERR,     "Lost Sync" ) \

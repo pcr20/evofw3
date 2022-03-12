@@ -1,4 +1,4 @@
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #include <avr/interrupt.h>
 #endif
 #include "led.h"

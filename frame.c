@@ -1,5 +1,5 @@
 #include <string.h>
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #include <util/delay.h>
 
 #include <avr/interrupt.h>
@@ -14,6 +14,10 @@
 #include "cc1101.h"
 
 #include "frame.h"
+
+#ifdef ESP32
+#include <pgmspace.h>
+#endif
 
 #define DEBUG_FRAME(_v)    DEBUG3(_v)
 

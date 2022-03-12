@@ -1,9 +1,16 @@
-#include <avr/pgmspace.h>
+
+#if !(defined(ESP8266) || defined(ESP32))
+  #include <avr/pgmspace.h>
+#endif
 #include <string.h>
 
 #include "nv.h"
 
 #include "cc1101_param.h"
+
+#ifdef ESP32
+#include <pgmspace.h>
+#endif
 
 static inline uint8_t cc1100_cfg_default( uint8_t *cfg ) {
   // CC1101 default register settings

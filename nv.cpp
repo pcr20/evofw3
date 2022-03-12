@@ -8,7 +8,7 @@
 ** L specifies the number of bytes that follow in
 ** V the value
 */
-#ifndef ESP8266
+#if !(defined(ESP8266) || defined(ESP32))
 #include <avr/eeprom.h>
 #include <avr/eeprom.h>
 #else
