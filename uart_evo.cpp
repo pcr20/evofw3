@@ -16,6 +16,16 @@
 #else
 #include <Arduino.h>
 #include <HardwareSerial.h>
+//#include <esp_intr_alloc.h>
+#include <driver/uart.h>
+
+
+static void IRAM_ATTR uart_intr_handle(void *arg);
+
+// Both definition are same and valid
+//static uart_isr_handle_t *handle_console;
+static intr_handle_t handle_console;
+
 #endif
 
 #include <string.h>
@@ -454,6 +464,59 @@ ISR(GDO2_INT_VECT) {
 #define UBRR(_f,_b) ( ( ( ( (_f)/16 ) + ((_b)/2) )/( _b ) ) - 1 )
 
 void rx_init(void) {
+  #if defined(ESP32)
+  #define BUF_SIZE (1024) //this isn't used - other than possibly to allocate a ring buffer which is then not used
+
+
+  //from https://github.com/theElementZero/ESP32-UART-interrupt-handling/blob/master/uart_interrupt.c
+	/* Configure parameters of an UART driver,
+	* communication pins and install the driver */
+	uart_config_t uart_config = {
+		.baud_rate = RADIO_BAUDRATE,
+		.data_bits = UART_DATA_8_BITS,
+		.parity = UART_PARITY_DISABLE,
+		.stop_bits = UART_STOP_BITS_1,
+		.flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+	};
+
+	ESP_ERROR_CHECK(uart_param_config(EX_UART_NUM, &uart_config));
+
+	//Set UART log level
+	//esp_log_level_set(TAG, ESP_LOG_INFO);
+
+  // logging feature looks neat - might be possible to access the ring buffer and dump over serial port
+
+	//Set UART pins (using UART0 default pins ie no changes.)
+	ESP_ERROR_CHECK(uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+	//Install UART driver, and get the queue.
+	ESP_ERROR_CHECK(uart_driver_install(EX_UART_NUM, BUF_SIZE * 2, 0, 0, NULL, 0));
+
+	// release the pre registered UART handler/subroutine
+	ESP_ERROR_CHECK(uart_isr_free(EX_UART_NUM));
+
+	// register new UART subroutine
+	ESP_ERROR_CHECK(uart_isr_register(EX_UART_NUM,uart_intr_handle, NULL, ESP_INTR_FLAG_IRAM, &handle_console));
+
+//from esp-idf v3.x uart.c
+    uart_intr_config_t uart_intr;
+    uart_intr.intr_enable_mask = UART_RXFIFO_FULL_INT_ENA_M
+                            | UART_RXFIFO_TOUT_INT_ENA_M
+                            | UART_FRM_ERR_INT_ENA_M
+                            | UART_RXFIFO_OVF_INT_ENA_M
+                            | UART_BRK_DET_INT_ENA_M
+                            | UART_PARITY_ERR_INT_ENA_M;
+        uart_intr.rxfifo_full_thresh = 1; //#define UART_FULL_THRESH_DEFAULT  (120)
+        uart_intr.rx_timeout_thresh = 10; //#define UART_TOUT_THRESH_DEFAULT   (10)
+        uart_intr.txfifo_empty_intr_thresh = 10; //#define UART_EMPTY_THRESH_DEFAULT  (10)
+
+
+
+    //should give interrupt on every byte received
+    ESP_ERROR_CHECK(uart_intr_config(EX_UART_NUM, &uart_intr));
+
+
+  #else
   uint8_t sreg = SREG;
   cli();
 
@@ -481,24 +544,66 @@ void rx_init(void) {
   UBRR1L = UBRR(F_CPU,RADIO_BAUDRATE);
   
   SREG = sreg;
+  #endif
 }
 
 //---------------------------------------------------------------------------------
 
 static void rx_start(void) {
-  UCSR1B |=  ( 1<<RXEN1 )   // Enable Receiver
-           | ( 1<<RXCIE1 ); // Enable RX complete interrupt
+  //UCSR1B |=  ( 1<<RXEN1 )   // Enable Receiver
+  //         | ( 1<<RXCIE1 ); // Enable RX complete interrupt
+  //Serial2.begin(RADIO_BAUDRATE);
+  	// enable RX interrupt
+	ESP_ERROR_CHECK(uart_enable_rx_intr(EX_UART_NUM));
+
 }
 
 //---------------------------------------------------------------------------------
 
 static void rx_stop(void) {
-  UCSR1B &=  ~( 1<<RXCIE1 )  // Disable RX complete interrupt
-           & ~( 1<<RXEN1 );  // Stop receiver
+  //UCSR1B &=  ~( 1<<RXCIE1 )  // Disable RX complete interrupt
+  //         & ~( 1<<RXEN1 );  // Stop receiver
+//  Serial2.end();
+	// disable RX interrupt
+  ESP_ERROR_CHECK(uart_disable_rx_intr(EX_UART_NUM));
+
 }
 
 //---------------------------------------------------------------------------------
+#if defined(ESP32)
 
+/*
+ * Define UART interrupt subroutine to ackowledge interrupt
+ */
+static void IRAM_ATTR uart_intr_handle(void *arg)
+{
+  // Receive buffer to collect incoming data
+  static uint8_t rxbuf[256];
+  // Register to collect data length
+  uint16_t urxlen;
+  uint16_t rx_fifo_len, status;
+  uint16_t i;
+  
+  status = UART0.int_st.val; // read UART interrupt Status
+  rx_fifo_len = UART0.status.rxfifo_cnt; // read number of bytes in UART buffer
+  
+  while(rx_fifo_len){
+   rxbuf[i++] = UART0.fifo.rw_byte; // read all bytes
+   rx_fifo_len--;
+ }
+
+  frame_rx_byte(rxbuf[0]); //should only be one byte
+
+ // after reading bytes from buffer clear UART interrupt status
+ uart_clear_intr_status(EX_UART_NUM, UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
+
+// a test code or debug code to indicate UART receives successfully,
+// you can redirect received byte as echo also
+// uart_write_bytes(EX_UART_NUM, (const char*) "RX Done", 7);
+
+}
+#else
+//ISR reads the uart when there is a byte ready
 ISR( USART1_RX_vect ) {
   volatile uint8_t status __attribute__((unused));
   uint8_t data;
@@ -509,6 +614,7 @@ DEBUG_ISR(1);
   frame_rx_byte(data);
 DEBUG_ISR(0);
 }
+#endif
 
 #endif // HWUART RX
 
@@ -698,15 +804,6 @@ static void tx_start(void) {
   attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,FALLING); //TODO: not sure this is right
 }
 
-
-static void rx_start(void) {
-}
-
-static void rx_stop(void) {
-}
-
-static void rx_init(void) {
-}
 //---------------------------------------------------------------------------------
 
 
@@ -772,8 +869,23 @@ void uart_work(void) {
 }
 
 void uart_init_evo(void) {
-  Serial.begin(RADIO_BAUDRATE);
-  attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,CHANGE); //not sure CHANGE is right
+  //HardwareSerial.cpp declares:
+  //HardwareSerial Serial(0);
+  //HardwareSerial Serial1(1);
+  //HardwareSerial Serial2(2);    rxPin = RX2; txPin = TX2; - see construdctor for HardwareSerial
+  // in cores/esp32/HardwareSerial.cpp
+  // somewhat unhelpfully HardwareSerial.cpp appears to be the only place which defines RX2 and TX2
+  // I've added them to evo_pins.h
+
+  //SerialX.begin calls uartBegin in esp32-hal-uart which setups the port and enable the RX interrupt
+  // it appears that the processor has individual interrupt handlers for each UART, however the code uses a single hander for all interrupts
+
+  
+
+
+  attachInterrupt(GDO0_PIN,gdo0_int_vec_handler,CHANGE); //not sure CHANGE is right, and not sure if you can enable an interrupt when the pin
+  // is used as a uart
+
   //uint8_t sreg = SREG;
   #ifdef ESP8266 //ESP32 is dual core, cannot simply disable interrupts
     uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above

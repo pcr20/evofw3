@@ -12,11 +12,13 @@
 //
 // for HwCS, CS pin needs to be GPIO15  (pinSet is SPI_PINS_HSPI)
 //
-static uint8_t MISOPin=SPI_MISO;
-static uint8_t MOSIPin=SPI_MOSI;
-static uint8_t chipSelectPin=SPI_SS;
-static uint8_t SCLKPin=SPI_SCLK;
-//
+// on ESP32, the SPI object is instantiated in SPI.cpp as SPIClass SPI(VSPI);
+// VSPI determines which SPI peripheral, and which pins - see esp32-hal-spi.h
+// pins are defined in pins_arduino.h:
+//static const uint8_t SS    = 5;
+//static const uint8_t MOSI  = 23;
+//static const uint8_t MISO  = 19;
+//static const uint8_t SCK   = 18;
 
 
 void spi_init(void) {
@@ -40,7 +42,7 @@ void spi_assert(void) {
 
 uint8_t spi_check_miso(void) {
   //return ( SPI_PIN & (1 << SPI_MISO) );
-  return ( digitalRead(MISOPin));
+  return ( digitalRead(MISO));
 }
 
 uint8_t spi_send(uint8_t data) {
